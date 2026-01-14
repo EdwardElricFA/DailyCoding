@@ -10,9 +10,9 @@ import MapKit
 
 extension MKCoordinateRegion {
     /// Acts as user current location
-    static var applePark: Self {
+    static var appleStore: Self {
         Self(
-            center: CLLocationCoordinate2D(latitude: 37.3346, longitude: -122.0090),
+            center: CLLocationCoordinate2D(latitude: 30.2542, longitude: 120.1634),
             latitudinalMeters: 250000,
             longitudinalMeters: 250000
         )
