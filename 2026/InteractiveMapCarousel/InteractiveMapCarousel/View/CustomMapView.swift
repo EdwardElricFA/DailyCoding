@@ -24,12 +24,21 @@ struct CustomMapView: View {
     /// For Animated Camera Updates
     @State private var cameraPosition: MapCameraPosition
     @State private var places: [Place] = []
+    @State private var selectedPlaceID: UUID?
+    @State private var expandedItem: Place?
     /// Enviroment Properties
+    @Namespace private var animationID
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
-            Map(position: $cameraPosition)
+            Map(position: $cameraPosition) {
+                ForEach(places) { place in
+                    Annotation(place.name, coordinate: place.coordinates) {
+                        AnnotationView(place)
+                    }
+                }
+            }
                 /// Overlaying a Dark Background until the places is being fetched!
                 .overlay {
                     LoadingOverlay()
@@ -63,13 +72,17 @@ struct CustomMapView: View {
                                 
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.largeTitle)
+                                    .font(.title3)
                                     .foregroundStyle(Color.primary)
                             }
                             
                         }
                     }
                 }
+        }
+        .sheet(item: $expandedItem) { place in
+            DetailView(place: place)
+                .navigationTransition(.zoom(sourceID: place.id, in: animationID))
         }
         .onAppear {
             guard places.isEmpty else { return }
@@ -91,6 +104,7 @@ struct CustomMapView: View {
                     BottomCarouselCardView(place)
                         .padding(.horizontal, 15)
                         .frame(width: size.width, height: size.height)
+                        .matchedTransitionSource(id: place.id, in: animationID)
                 }
             }
             .scrollTargetLayout()
@@ -98,6 +112,16 @@ struct CustomMapView: View {
         .scrollIndicators(.hidden)
         .scrollClipDisabled()
         .scrollTargetBehavior(.paging)
+        .scrollPosition(id: $selectedPlaceID, anchor: .center)
+        .onChange(of: selectedPlaceID) { oldValue, newValue in
+            guard let coordinates = places.first(where: { $0.id == newValue })?.coordinates else {
+                return
+            }
+            
+            withAnimation(animation) {
+                cameraPosition = .camera(.init(centerCoordinate: coordinates, distance: 25000))
+            }
+        }
     }
     
     @ViewBuilder
@@ -118,7 +142,7 @@ struct CustomMapView: View {
                 Spacer(minLength: 0)
                 
                 Button {
-                    
+                    expandedItem = place
                 } label: {
                     Text("Learn More")
                         .frame(maxWidth: .infinity)
@@ -155,14 +179,41 @@ struct CustomMapView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.blue)
                     .buttonBorderShape(.capsule)
-                    .disabled(true)
                 }
+                .disabled(true)
                 .redacted(reason: .placeholder)
             }
         }
         .padding(15)
         /// Applying Glass Effect
         .optionalGlassEffect(colorScheme)
+    }
+    
+    @ViewBuilder
+    func AnnotationView(_ place:Place) -> some View {
+        let isSelected = place.id == selectedPlaceID
+        
+        Image(.logo)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(width: isSelected ? 50 : 20, height: isSelected ? 50 : 20)
+            .background {
+                Circle()
+                    .fill(.white)
+                    .padding(-1)
+            }
+            .animation(animation, value: isSelected)
+            .background {
+                if isSelected {
+                    PulseRingView(tint: colorScheme == .dark ? .white : .orange, size: 80)
+                }
+            }
+            .contentShape(.rect)
+            .onTapGesture {
+                withAnimation(animation) {
+                    selectedPlaceID = place.id
+                }
+            }
     }
     /// Fetching Lookup Places
     private func fetchPlaces() {
@@ -173,7 +224,8 @@ struct CustomMapView: View {
             
             let search = MKLocalSearch(request: request)
             if let items = try? await search.start().mapItems {
-                    print(items)
+                /// print(items)
+                try? await Task.sleep(for: .seconds(0.5))
                 /// Converting mapItems into Places
                 let places = items.compactMap { item in
                     let name = item.name ?? "Unknown"
@@ -190,6 +242,8 @@ struct CustomMapView: View {
                 /// Animating Map Items
                 withAnimation(animation) {
                     self.places = places
+                    /// first place as active item
+                    self.selectedPlaceID = places.first?.id
                 }
             }
         }
@@ -200,11 +254,19 @@ struct CustomMapView: View {
     }
 }
 
+struct DetailView: View {
+    var place: Place
+    var body: some View {
+        Text("This is a detail view!")
+            .presentationDetents([.medium])
+    }
+}
+
 #Preview {
     CustomMapView(
         userRegion: .appleStore,
         userCoordinates: MKCoordinateRegion.appleStore.center,
         lookupText: "星巴克",
-        limit: 3
+        limit: 5
     )
 }

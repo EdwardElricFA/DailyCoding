@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import MapKit
 
 struct ContentView: View {
     @State private var showView: Bool = false
@@ -19,7 +20,12 @@ struct ContentView: View {
             .navigationTitle("Map Carousel")
         }
         .fullScreenCover(isPresented: $showView) {
-           // CustomMapView()
+            CustomMapView(
+                userRegion: .appleStore,
+                userCoordinates: MKCoordinateRegion.appleStore.center,
+                lookupText: "星巴克",
+                limit: 3
+            )
         }
     }
 }
